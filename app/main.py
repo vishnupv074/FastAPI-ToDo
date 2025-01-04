@@ -1,6 +1,7 @@
 from typing import Annotated
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, Path, status
 from .models import Base, Todos
 from .database import engine, SessionLocal
 
@@ -18,9 +19,46 @@ def get_db():
         db.close()
 
 
+# Dependancy injection
 db_dependancy = Annotated[Session, Depends(get_db)]
+
+
+class TodosRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=50)
+    description: str = Field(min_length=3, max_length=100)
+    priority: int = Field(ge=1, lt=6)
+    complete: bool
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "title": "Code something",
+                "description": "Code some tutorials and push",
+                "priority": 1,
+                "complete": False,
+            }
+        }
+    }
 
 
 @app.get("/")
 async def read_all(db: db_dependancy):
     return db.query(Todos).all()
+
+
+@app.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
+async def read_todo(db: db_dependancy, todo_id: int = Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is not None:
+        return todo_model
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found!"
+    )
+
+
+@app.post("/todos", status_code=status.HTTP_201_CREATED)
+async def create_todo(db: db_dependancy, todo_request: TodosRequest):
+    todo_model = Todos(**todo_request.model_dump())
+
+    db.add(todo_model)
+    db.commit()
