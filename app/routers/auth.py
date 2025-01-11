@@ -11,13 +11,13 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 SECRET_KEY = "a790b95dcbac742efc25987f91572948567be0ea68e102829619b23d5298c76e"
 ALGORITHM = "HS256"
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_bearer = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 def get_db():
@@ -57,14 +57,14 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         if username is None and user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials!",
+                detail="Could not validate user!",
             )
 
         return {"username": username, "id": user_id}
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials!",
+            detail="Could not validate user!",
         )
 
 
@@ -95,7 +95,7 @@ class Token(BaseModel):
     token_type: str
 
 
-@router.post("/auth", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(
     db: db_dependancy, create_user_request: CreateUserRequest
 ):
@@ -121,6 +121,9 @@ async def login_for_access_token(
 ):
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
-        return "User not authenticated!"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate user!",
+        )
     token = create_access_token(user.username, user.id, timedelta(minutes=20))
     return {"access_token": token, "token_type": "bearer"}
