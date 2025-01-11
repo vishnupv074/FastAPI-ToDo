@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from app.models import Todos
 from app.database import SessionLocal
+from .auth import get_current_user
 
 
 router = APIRouter()
@@ -19,6 +20,7 @@ def get_db():
 
 # Dependancy injection
 db_dependancy = Annotated[Session, Depends(get_db)]
+user_dependancy = Annotated[dict, Depends(get_current_user)]
 
 
 class TodosRequest(BaseModel):
@@ -55,8 +57,15 @@ async def read_todo(db: db_dependancy, todo_id: int = Path(gt=0)):
 
 
 @router.post("/todos", status_code=status.HTTP_201_CREATED)
-async def create_todo(db: db_dependancy, todo_request: TodosRequest):
-    todo_model = Todos(**todo_request.model_dump())
+async def create_todo(
+    user: user_dependancy, db: db_dependancy, todo_request: TodosRequest
+):
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication Failed!",
+        )
+    todo_model = Todos(**todo_request.model_dump(), owner_id=user.get('id'))
 
     db.add(todo_model)
     db.commit()
