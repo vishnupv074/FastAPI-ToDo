@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -7,9 +8,13 @@ from app.database import SessionLocal
 from sqlalchemy.orm.session import Session
 from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt
 
 
 router = APIRouter()
+
+SECRET_KEY = "a790b95dcbac742efc25987f91572948567be0ea68e102829619b23d5298c76e"
+ALGORITHM = "HS256"
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -35,6 +40,14 @@ def authenticate_user(username, password, db) -> bool:
     return user
 
 
+def create_access_token(username: str, user_id: int, expiry_delta: timedelta):
+
+    encode = {"sub": username, "id": user_id}
+    expires = datetime.now(timezone.utc) + expiry_delta
+    encode.update({"exp": expires})
+    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
 class CreateUserRequest(BaseModel):
     username: str
     email: str
@@ -57,6 +70,11 @@ class CreateUserRequest(BaseModel):
     }
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
 @router.post("/auth", status_code=status.HTTP_201_CREATED)
 async def create_user(
     db: db_dependancy, create_user_request: CreateUserRequest
@@ -76,7 +94,7 @@ async def create_user(
     db.commit()
 
 
-@router.post("/token")
+@router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: db_dependancy,
@@ -84,4 +102,5 @@ async def login_for_access_token(
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
         return "User not authenticated!"
-    return "Successful Authentication"
+    token = create_access_token(user.username, user.id, timedelta(minutes=20))
+    return {"access_token": token, "token_type": "bearer"}
