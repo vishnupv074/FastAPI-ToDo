@@ -122,7 +122,7 @@ async def update_todo(
 
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete(
-    user: user_dependancy, db: db_dependancy, todo_id: int = Path(gt=1)
+    user: user_dependancy, db: db_dependancy, todo_id: int = Path(ge=1)
 ):
     if user is None:
         raise HTTPException(
