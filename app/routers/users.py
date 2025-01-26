@@ -1,8 +1,8 @@
 from typing import Annotated
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Path, status
-from app.models import Todos, Users
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.models import Users
 from app.database import SessionLocal
 from .auth import get_current_user, bcrypt_context
 
